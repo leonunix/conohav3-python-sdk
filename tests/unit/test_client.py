@@ -226,3 +226,75 @@ class TestConoHaClient:
         """Trailing slash is stripped from env endpoint URLs."""
         client = ConoHaClient(token="tok", tenant_id="tid")
         assert client._get_endpoint("compute") == "https://env-compute.example.com"
+
+    @patch("conoha.client.requests.post")
+    def test_authenticate_uses_endpoint_override(self, mock_post):
+        """authenticate() respects user-specified identity endpoint."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 201
+        mock_resp.headers = {"x-subject-token": "tok"}
+        mock_resp.json.return_value = {
+            "token": {
+                "project": {"id": "tid"},
+                "user": {"id": "uid"},
+                "catalog": [],
+                "expires_at": "2026-02-18T12:00:00Z",
+            }
+        }
+        mock_post.return_value = mock_resp
+
+        client = ConoHaClient(
+            username="u", password="p", tenant_id="t",
+            endpoints={"identity": "https://custom-identity.example.com"},
+        )
+        call_url = mock_post.call_args[0][0]
+        assert call_url.startswith("https://custom-identity.example.com")
+
+    @patch("conoha.client.requests.post")
+    def test_authenticate_parses_expires_at(self, mock_post):
+        """authenticate() parses expires_at from response."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 201
+        mock_resp.headers = {"x-subject-token": "tok"}
+        mock_resp.json.return_value = {
+            "token": {
+                "project": {"id": "tid"},
+                "user": {"id": "uid"},
+                "catalog": [],
+                "expires_at": "2026-02-18T12:00:00Z",
+            }
+        }
+        mock_post.return_value = mock_resp
+
+        client = ConoHaClient(
+            username="u", password="p", tenant_id="t",
+        )
+        # Should parse the ISO timestamp, not use hardcoded 24h
+        from datetime import datetime, timezone
+        expected_ts = datetime(2026, 2, 18, 12, 0, 0,
+                               tzinfo=timezone.utc).timestamp() - 300
+        assert abs(client._token_expires_at - expected_ts) < 1
+
+    @patch("conoha.client.requests.post")
+    def test_authenticate_expires_at_fallback(self, mock_post):
+        """authenticate() falls back to 24h when expires_at is absent."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 201
+        mock_resp.headers = {"x-subject-token": "tok"}
+        mock_resp.json.return_value = {
+            "token": {
+                "project": {"id": "tid"},
+                "user": {"id": "uid"},
+                "catalog": [],
+            }
+        }
+        mock_post.return_value = mock_resp
+
+        before = time.time()
+        client = ConoHaClient(
+            username="u", password="p", tenant_id="t",
+        )
+        after = time.time()
+        # Should be approximately now + 86400 - 300
+        assert client._token_expires_at >= before + 86400 - 300
+        assert client._token_expires_at <= after + 86400 - 300

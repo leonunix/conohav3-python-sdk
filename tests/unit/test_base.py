@@ -105,3 +105,37 @@ class TestBaseService:
 
             svc._patch("https://example.com/test")
             assert mock_req.call_args[0][0] == "PATCH"
+
+    def test_request_retries_on_401(self, mock_client, mock_response):
+        """401 triggers re-auth and retry when credentials are available."""
+        svc = BaseService(mock_client)
+        resp_401 = mock_response(401, text="Unauthorized")
+        resp_200 = mock_response(200, json_data={"ok": True})
+
+        with patch("conoha.base.requests.request",
+                    side_effect=[resp_401, resp_200]) as mock_req:
+            with patch.object(mock_client, "authenticate") as mock_auth:
+                result = svc._get("https://example.com/test")
+                mock_auth.assert_called_once()
+                assert mock_req.call_count == 2
+                assert result.json() == {"ok": True}
+
+    def test_request_no_retry_without_credentials(self, mock_client, mock_response):
+        """401 raises without retry when no password is set."""
+        mock_client._password = None
+        svc = BaseService(mock_client)
+        resp_401 = mock_response(401, text="Unauthorized")
+
+        with patch("conoha.base.requests.request", return_value=resp_401):
+            with pytest.raises(TokenExpiredError):
+                svc._get("https://example.com/test")
+
+    def test_request_retry_fails_again(self, mock_client, mock_response):
+        """Double 401 propagates error even after re-auth."""
+        svc = BaseService(mock_client)
+        resp_401 = mock_response(401, text="Unauthorized")
+
+        with patch("conoha.base.requests.request", return_value=resp_401):
+            with patch.object(mock_client, "authenticate"):
+                with pytest.raises(TokenExpiredError):
+                    svc._get("https://example.com/test")

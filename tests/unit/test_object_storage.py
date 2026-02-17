@@ -113,3 +113,94 @@ class TestObjectStorageService:
         with patch("conoha.base.requests.request", return_value=resp):
             meta = svc.get_object_metadata("container1", "file.txt")
             assert meta["Content-Type"] == "text/plain"
+
+    # ── Web Publishing ────────────────────────────────────────
+
+    def test_enable_web_publishing(self, mock_client, mock_response):
+        svc = ObjectStorageService(mock_client)
+        resp = mock_response(204)
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.enable_web_publishing("public-container")
+            headers = mock_req.call_args.kwargs["headers"]
+            assert headers["X-Container-Read"] == ".r:*"
+
+    def test_disable_web_publishing(self, mock_client, mock_response):
+        svc = ObjectStorageService(mock_client)
+        resp = mock_response(204)
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.disable_web_publishing("public-container")
+            headers = mock_req.call_args.kwargs["headers"]
+            assert headers["X-Container-Read"] == ""
+
+    # ── Versioning ────────────────────────────────────────────
+
+    def test_enable_versioning(self, mock_client, mock_response):
+        svc = ObjectStorageService(mock_client)
+        resp = mock_response(204)
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.enable_versioning("mycontainer", "versions-container")
+            headers = mock_req.call_args.kwargs["headers"]
+            assert headers["X-Versions-Location"] == "versions-container"
+
+    def test_disable_versioning(self, mock_client, mock_response):
+        svc = ObjectStorageService(mock_client)
+        resp = mock_response(204)
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.disable_versioning("mycontainer")
+            headers = mock_req.call_args.kwargs["headers"]
+            assert headers["X-Versions-Location"] == ""
+
+    # ── Large Objects ─────────────────────────────────────────
+
+    def test_create_dlo_manifest(self, mock_client, mock_response):
+        svc = ObjectStorageService(mock_client)
+        resp = mock_response(201)
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.create_dlo_manifest("mycontainer", "big-file", "segments/")
+            headers = mock_req.call_args.kwargs["headers"]
+            assert headers["X-Object-Manifest"] == "mycontainer/segments/"
+            assert mock_req.call_args[0][0] == "PUT"
+
+    def test_create_slo_manifest(self, mock_client, mock_response):
+        svc = ObjectStorageService(mock_client)
+        resp = mock_response(201)
+        segments = [
+            {"path": "/c/seg1", "etag": "abc", "size_bytes": 1024},
+            {"path": "/c/seg2", "etag": "def", "size_bytes": 512},
+        ]
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.create_slo_manifest("mycontainer", "big-file", segments)
+            assert mock_req.call_args[0][0] == "PUT"
+            params = mock_req.call_args.kwargs.get("params", {})
+            assert params["multipart-manifest"] == "put"
+
+    # ── Temporary URL ─────────────────────────────────────────
+
+    def test_set_temp_url_key(self, mock_client, mock_response):
+        svc = ObjectStorageService(mock_client)
+        resp = mock_response(204)
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.set_temp_url_key("my-secret-key")
+            headers = mock_req.call_args.kwargs["headers"]
+            assert headers["X-Account-Meta-Temp-URL-Key"] == "my-secret-key"
+
+    def test_set_temp_url_key_index_2(self, mock_client, mock_response):
+        svc = ObjectStorageService(mock_client)
+        resp = mock_response(204)
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.set_temp_url_key("key2", key_index=2)
+            headers = mock_req.call_args.kwargs["headers"]
+            assert headers["X-Account-Meta-Temp-URL-Key-2"] == "key2"
+
+    def test_generate_temp_url(self, mock_client, mock_response):
+        svc = ObjectStorageService(mock_client)
+        url = svc.generate_temp_url("container1", "file.txt", 3600,
+                                     method="GET", key="secret")
+        assert "temp_url_sig=" in url
+        assert "temp_url_expires=" in url
+        assert "/container1/file.txt" in url
+
+    def test_generate_temp_url_requires_key(self, mock_client):
+        svc = ObjectStorageService(mock_client)
+        with pytest.raises(ValueError, match="key is required"):
+            svc.generate_temp_url("c", "o", 60)

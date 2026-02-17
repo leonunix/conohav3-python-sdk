@@ -6,7 +6,7 @@
 
 ## 特徴
 
-- ConoHa VPS v3 API を全面カバー（8サービス、100以上のエンドポイント）
+- ConoHa VPS v3 API を幅広くカバー（8サービス、100以上のエンドポイント）
 - トークン認証の自動取得・自動更新
 - トークンレスポンスからのサービスカタログ自動検出
 - 遅延読み込みによるサービスクライアント
@@ -50,7 +50,7 @@ client = ConoHaClient(
 
 # サーバー一覧を取得
 servers = client.compute.list_servers_detail()
-for server in servers["servers"]:
+for server in servers:
     print(f"{server['id']}: {server['status']}")
 ```
 
@@ -107,7 +107,7 @@ client.compute.confirm_resize("server-id")
 
 # コンソールURL取得
 console = client.compute.get_console_url("server-id", console_type="novnc")
-print(console["remote_console"]["url"])
+print(console["url"])
 
 # SSHキーペア
 keypairs = client.compute.list_keypairs()
@@ -159,7 +159,7 @@ new_sg = client.network.create_security_group("web-server")
 
 # ルール追加: HTTP許可
 client.network.create_security_group_rule(
-    security_group_id=new_sg["security_group"]["id"],
+    security_group_id=new_sg["id"],
     direction="ingress",
     ethertype="IPv4",
     protocol="tcp",
@@ -170,7 +170,7 @@ client.network.create_security_group_rule(
 # ローカルネットワーク
 network = client.network.create_network()
 subnet = client.network.create_subnet(
-    network_id=network["network"]["id"],
+    network_id=network["id"],
     cidr="10.0.0.0/24",
 )
 
@@ -189,7 +189,7 @@ lb = client.load_balancer.create_load_balancer(
 
 # リスナー作成
 listener = client.load_balancer.create_listener(
-    loadbalancer_id=lb["loadbalancer"]["id"],
+    loadbalancer_id=lb["id"],
     protocol="TCP",
     protocol_port=80,
     name="http-listener",
@@ -197,7 +197,7 @@ listener = client.load_balancer.create_listener(
 
 # プール作成
 pool = client.load_balancer.create_pool(
-    listener_id=listener["listener"]["id"],
+    listener_id=listener["id"],
     protocol="TCP",
     lb_algorithm="ROUND_ROBIN",
     name="web-pool",
@@ -205,14 +205,14 @@ pool = client.load_balancer.create_pool(
 
 # メンバー追加
 client.load_balancer.create_member(
-    pool_id=pool["pool"]["id"],
+    pool_id=pool["id"],
     address="203.0.113.10",
     protocol_port=80,
 )
 
 # ヘルスモニター
 client.load_balancer.create_health_monitor(
-    pool_id=pool["pool"]["id"],
+    pool_id=pool["id"],
     monitor_type="TCP",
     delay=30,
     timeout=10,

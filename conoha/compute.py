@@ -199,6 +199,32 @@ class ComputeService(BaseService):
         resp = self._get(url)
         return resp.json()["addresses"]
 
+    def get_server_addresses_by_network(self, server_id, network_name):
+        """Get server IP addresses for a specific network.
+
+        GET /v2.1/servers/{server_id}/ips/{network_name}
+        """
+        url = f"{self._base_url}/v2.1/servers/{server_id}/ips/{network_name}"
+        resp = self._get(url)
+        return resp.json()[network_name]
+
+    # ── Server Settings ──────────────────────────────────────
+
+    def set_server_settings(self, server_id, hw_video_model=None,
+                            hw_vif_model=None, hw_disk_bus=None):
+        """Update server hardware settings. Server must be stopped.
+
+        POST /v2.1/servers/{server_id}/action
+        """
+        settings = {}
+        if hw_video_model is not None:
+            settings["hwVideoModel"] = hw_video_model
+        if hw_vif_model is not None:
+            settings["hwVifModel"] = hw_vif_model
+        if hw_disk_bus is not None:
+            settings["hwDiskBus"] = hw_disk_bus
+        self._server_action(server_id, {"setServerSettings": settings})
+
     # ── Server Security Groups ───────────────────────────────────
 
     def get_server_security_groups(self, server_id):

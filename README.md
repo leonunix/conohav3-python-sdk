@@ -6,7 +6,7 @@ A Python SDK for the [ConoHa VPS v3 API](https://doc.conoha.jp/reference/api-vps
 
 ## Features
 
-- Full coverage of ConoHa VPS v3 API (8 services, 100+ endpoints)
+- Broad coverage of ConoHa VPS v3 API (8 services, 100+ endpoints)
 - Automatic token authentication and refresh
 - Service catalog auto-discovery from token response
 - Lazy-loaded service clients
@@ -50,7 +50,7 @@ client = ConoHaClient(
 
 # List servers
 servers = client.compute.list_servers_detail()
-for server in servers["servers"]:
+for server in servers:
     print(f"{server['id']}: {server['status']}")
 ```
 
@@ -107,12 +107,12 @@ client.compute.confirm_resize("server-id")
 
 # Get console URL
 console = client.compute.get_console_url("server-id", console_type="novnc")
-print(console["remote_console"]["url"])
+print(console["url"])
 
 # SSH keypairs
 keypairs = client.compute.list_keypairs()
 new_key = client.compute.create_keypair("my-key")
-print(new_key["keypair"]["private_key"])
+print(new_key["private_key"])
 
 # Monitoring
 cpu_data = client.compute.get_cpu_graph("server-id")
@@ -160,7 +160,7 @@ new_sg = client.network.create_security_group("web-server")
 
 # Add rule: allow HTTP ingress
 client.network.create_security_group_rule(
-    security_group_id=new_sg["security_group"]["id"],
+    security_group_id=new_sg["id"],
     direction="ingress",
     ethertype="IPv4",
     protocol="tcp",
@@ -171,7 +171,7 @@ client.network.create_security_group_rule(
 # Local networks
 network = client.network.create_network()
 subnet = client.network.create_subnet(
-    network_id=network["network"]["id"],
+    network_id=network["id"],
     cidr="10.0.0.0/24",
 )
 
@@ -190,7 +190,7 @@ lb = client.load_balancer.create_load_balancer(
 
 # Create listener
 listener = client.load_balancer.create_listener(
-    loadbalancer_id=lb["loadbalancer"]["id"],
+    loadbalancer_id=lb["id"],
     protocol="TCP",
     protocol_port=80,
     name="http-listener",
@@ -198,7 +198,7 @@ listener = client.load_balancer.create_listener(
 
 # Create pool
 pool = client.load_balancer.create_pool(
-    listener_id=listener["listener"]["id"],
+    listener_id=listener["id"],
     protocol="TCP",
     lb_algorithm="ROUND_ROBIN",
     name="web-pool",
@@ -206,14 +206,14 @@ pool = client.load_balancer.create_pool(
 
 # Add members
 client.load_balancer.create_member(
-    pool_id=pool["pool"]["id"],
+    pool_id=pool["id"],
     address="203.0.113.10",
     protocol_port=80,
 )
 
 # Health monitor
 client.load_balancer.create_health_monitor(
-    pool_id=pool["pool"]["id"],
+    pool_id=pool["id"],
     monitor_type="TCP",
     delay=30,
     timeout=10,

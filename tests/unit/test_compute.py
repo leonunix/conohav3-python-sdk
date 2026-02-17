@@ -223,3 +223,26 @@ class TestComputeService:
             cpu = svc.get_cpu_graph("s1", mode="average")
             assert cpu["schema"] == ["unixtime", "value"]
             assert mock_req.call_args.kwargs["params"]["mode"] == "average"
+
+    def test_get_server_addresses_by_network(self, mock_client, mock_response):
+        svc = ComputeService(mock_client)
+        resp = mock_response(
+            200,
+            json_data={"ext-net": [{"addr": "1.2.3.4", "version": 4}]},
+        )
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            addrs = svc.get_server_addresses_by_network("s1", "ext-net")
+            assert addrs[0]["addr"] == "1.2.3.4"
+            url = mock_req.call_args[0][1]
+            assert "/v2.1/servers/s1/ips/ext-net" in url
+
+    def test_set_server_settings(self, mock_client, mock_response):
+        svc = ComputeService(mock_client)
+        resp = mock_response(202)
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.set_server_settings("s1", hw_video_model="qxl",
+                                    hw_vif_model="virtio")
+            body = mock_req.call_args.kwargs["json"]
+            assert body["setServerSettings"]["hwVideoModel"] == "qxl"
+            assert body["setServerSettings"]["hwVifModel"] == "virtio"
+            assert "hwDiskBus" not in body["setServerSettings"]

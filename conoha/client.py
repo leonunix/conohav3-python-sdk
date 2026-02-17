@@ -2,6 +2,7 @@
 
 import os
 import time
+from datetime import datetime, timezone
 
 import requests
 
@@ -148,7 +149,7 @@ class ConoHaClient:
 
         POST /v3/auth/tokens
         """
-        identity_url = BASE_URLS["identity"].format(region=self.region)
+        identity_url = self._get_endpoint("identity")
         url = f"{identity_url}/v3/auth/tokens"
 
         # Build auth body
@@ -197,8 +198,15 @@ class ConoHaClient:
         self._token = resp.headers.get("x-subject-token")
         data = resp.json()["token"]
 
-        # Set expiry (24h from now with 5-minute buffer)
-        self._token_expires_at = time.time() + 86400 - 300
+        # Set expiry from response, with 5-minute safety buffer
+        expires_at_str = data.get("expires_at")
+        if expires_at_str:
+            expires_dt = datetime.fromisoformat(
+                expires_at_str.replace("Z", "+00:00")
+            )
+            self._token_expires_at = expires_dt.timestamp() - 300
+        else:
+            self._token_expires_at = time.time() + 86400 - 300
 
         # Extract user and project info
         if "project" in data:

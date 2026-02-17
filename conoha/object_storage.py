@@ -1,5 +1,10 @@
 """ConoHa Object Storage API service."""
 
+import hashlib
+import hmac
+import json
+import time
+
 from .base import BaseService
 
 
@@ -188,3 +193,115 @@ class ObjectStorageService(BaseService):
         url = self._account_url(f"/{container}/{object_name}")
         resp = self._head(url)
         return dict(resp.headers)
+
+    # ── Web Publishing ────────────────────────────────────────
+
+    def enable_web_publishing(self, container):
+        """Enable public web publishing for a container.
+
+        POST /v1/AUTH_{tenant_id}/{container}
+        Sets X-Container-Read to .r:* for anonymous read access.
+        """
+        url = self._account_url(f"/{container}")
+        self._post(url, extra_headers={"X-Container-Read": ".r:*"})
+
+    def disable_web_publishing(self, container):
+        """Disable public web publishing for a container.
+
+        POST /v1/AUTH_{tenant_id}/{container}
+        """
+        url = self._account_url(f"/{container}")
+        self._post(url, extra_headers={"X-Container-Read": ""})
+
+    # ── Versioning ────────────────────────────────────────────
+
+    def enable_versioning(self, container, versions_container):
+        """Enable object versioning on a container.
+
+        POST /v1/AUTH_{tenant_id}/{container}
+        Old versions are stored in versions_container.
+        """
+        url = self._account_url(f"/{container}")
+        self._post(
+            url,
+            extra_headers={"X-Versions-Location": versions_container},
+        )
+
+    def disable_versioning(self, container):
+        """Disable object versioning on a container.
+
+        POST /v1/AUTH_{tenant_id}/{container}
+        """
+        url = self._account_url(f"/{container}")
+        self._post(url, extra_headers={"X-Versions-Location": ""})
+
+    # ── Dynamic Large Object (DLO) ───────────────────────────
+
+    def create_dlo_manifest(self, container, manifest_name, object_prefix,
+                            content_type=None):
+        """Create a Dynamic Large Object manifest.
+
+        PUT /v1/AUTH_{tenant_id}/{container}/{manifest_name}
+        Segments are found by prefix in the same container.
+        """
+        url = self._account_url(f"/{container}/{manifest_name}")
+        headers = {"X-Object-Manifest": f"{container}/{object_prefix}"}
+        if content_type:
+            headers["Content-Type"] = content_type
+        self._put(url, data=b"", extra_headers=headers)
+
+    # ── Static Large Object (SLO) ────────────────────────────
+
+    def create_slo_manifest(self, container, manifest_name, segments,
+                            content_type=None):
+        """Create a Static Large Object manifest.
+
+        PUT /v1/AUTH_{tenant_id}/{container}/{manifest_name}?multipart-manifest=put
+        segments: list of dicts with keys 'path', 'etag', 'size_bytes'.
+        """
+        url = self._account_url(f"/{container}/{manifest_name}")
+        params = {"multipart-manifest": "put"}
+        headers = {}
+        if content_type:
+            headers["Content-Type"] = content_type
+        self._put(
+            url,
+            params=params,
+            data=json.dumps(segments).encode("utf-8"),
+            extra_headers=headers or None,
+        )
+
+    # ── Temporary URL ─────────────────────────────────────────
+
+    def set_temp_url_key(self, key, key_index=1):
+        """Set the temporary URL key for the account.
+
+        POST /v1/AUTH_{tenant_id}
+        key_index: 1 or 2 (supports two keys for rotation).
+        """
+        url = self._account_url()
+        header_name = "X-Account-Meta-Temp-URL-Key"
+        if key_index == 2:
+            header_name = "X-Account-Meta-Temp-URL-Key-2"
+        self._post(url, extra_headers={header_name: key})
+
+    def generate_temp_url(self, container, object_name, seconds,
+                          method="GET", key=None):
+        """Generate a temporary URL for an object.
+
+        Client-side HMAC computation; requires temp_url_key set on account.
+        """
+        if key is None:
+            raise ValueError("key is required to generate a temporary URL")
+
+        expires = int(time.time()) + seconds
+        path = f"/v1/AUTH_{self._tenant_id}/{container}/{object_name}"
+        sig_body = f"{method}\n{expires}\n{path}"
+        sig = hmac.new(
+            key.encode("utf-8"),
+            sig_body.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+
+        base = self._account_url(f"/{container}/{object_name}")
+        return f"{base}?temp_url_sig={sig}&temp_url_expires={expires}"

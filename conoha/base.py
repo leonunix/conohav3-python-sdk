@@ -36,15 +36,34 @@ class BaseService:
         return headers
 
     def _request(self, method, url, **kwargs):
-        headers = self._get_headers(kwargs.pop("extra_headers", None))
-        if "headers" in kwargs:
-            headers.update(kwargs.pop("headers"))
+        extra_headers = kwargs.pop("extra_headers", None)
+        caller_headers = kwargs.pop("headers", None)
         timeout = kwargs.pop("timeout", self._client.timeout)
 
+        def _build_headers():
+            hdrs = self._get_headers(extra_headers)
+            if caller_headers:
+                hdrs.update(caller_headers)
+            return hdrs
+
+        headers = _build_headers()
         response = requests.request(
             method, url, headers=headers, timeout=timeout, **kwargs
         )
-        self._handle_response(response)
+
+        try:
+            self._handle_response(response)
+        except TokenExpiredError:
+            if self._client._password:
+                self._client.authenticate()
+                headers = _build_headers()
+                response = requests.request(
+                    method, url, headers=headers, timeout=timeout, **kwargs
+                )
+                self._handle_response(response)
+            else:
+                raise
+
         return response
 
     def _handle_response(self, response):
