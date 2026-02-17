@@ -182,10 +182,10 @@ class ComputeService(BaseService):
     def update_server_metadata(self, server_id, metadata):
         """Update server metadata.
 
-        PUT /v2.1/servers/{server_id}/metadata
+        POST /v2.1/servers/{server_id}/metadata
         """
         url = f"{self._base_url}/v2.1/servers/{server_id}/metadata"
-        resp = self._put(url, json={"metadata": metadata})
+        resp = self._post(url, json={"metadata": metadata})
         return resp.json()["metadata"]
 
     # ── Server Addresses ─────────────────────────────────────────

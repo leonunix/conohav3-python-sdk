@@ -122,6 +122,66 @@ class TestConoHaClient:
         assert client._catalog_endpoints["compute"] == "https://compute.c3j1.conoha.io"
         assert client._catalog_endpoints["dns"] == "https://dns-service.c3j1.conoha.io"
 
+    @patch("conoha.client.requests.post")
+    def test_parse_catalog_strips_paths(self, mock_post):
+        """Catalog URLs with version paths are stripped to scheme+host."""
+        mock_resp = MagicMock()
+        mock_resp.status_code = 201
+        mock_resp.headers = {"x-subject-token": "tok"}
+        mock_resp.json.return_value = {
+            "token": {
+                "project": {"id": "tid"},
+                "user": {"id": "uid"},
+                "catalog": [
+                    {
+                        "type": "compute",
+                        "endpoints": [
+                            {
+                                "interface": "public",
+                                "url": "https://compute.c3j1.conoha.io/v2.1",
+                            }
+                        ],
+                    },
+                    {
+                        "type": "identity",
+                        "endpoints": [
+                            {
+                                "interface": "public",
+                                "url": "https://identity.c3j1.conoha.io/v3",
+                            }
+                        ],
+                    },
+                    {
+                        "type": "volumev3",
+                        "endpoints": [
+                            {
+                                "interface": "public",
+                                "url": "https://block-storage.c3j1.conoha.io/v3/tid",
+                            }
+                        ],
+                    },
+                    {
+                        "type": "object-store",
+                        "endpoints": [
+                            {
+                                "interface": "public",
+                                "url": "https://object-storage.c3j1.conoha.io/v1/AUTH_tid",
+                            }
+                        ],
+                    },
+                ],
+            }
+        }
+        mock_post.return_value = mock_resp
+
+        client = ConoHaClient(
+            username="u", password="p", tenant_id="t"
+        )
+        assert client._catalog_endpoints["compute"] == "https://compute.c3j1.conoha.io"
+        assert client._catalog_endpoints["identity"] == "https://identity.c3j1.conoha.io"
+        assert client._catalog_endpoints["block_storage"] == "https://block-storage.c3j1.conoha.io"
+        assert client._catalog_endpoints["object_storage"] == "https://object-storage.c3j1.conoha.io"
+
     def test_token_property_no_auth(self):
         """Accessing token without auth raises error."""
         client = ConoHaClient.__new__(ConoHaClient)

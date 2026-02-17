@@ -323,7 +323,7 @@ pytest tests/unit/
 pytest tests/unit/ --cov=conoha --cov-report=term-missing
 
 # Integration tests (requires real credentials)
-CONOHA_USERNAME=xxx CONOHA_PASSWORD=xxx CONOHA_TENANT_ID=xxx \
+CONOHA_USER_ID=xxx CONOHA_PASSWORD=xxx CONOHA_TENANT_ID=xxx \
   pytest tests/integration/ --run-integration
 ```
 

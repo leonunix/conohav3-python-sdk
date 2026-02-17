@@ -63,39 +63,6 @@ class TestIdentityService:
         with patch("conoha.base.requests.request", return_value=resp):
             svc.delete_credential("uid", "key1")  # Should not raise
 
-    # ── Token Management ──────────────────────────────────────
-
-    def test_validate_token(self, mock_client, mock_response):
-        svc = IdentityService(mock_client)
-        resp = mock_response(
-            200,
-            json_data={"token": {"user": {"id": "uid"}, "expires_at": "2026-02-18T12:00:00Z"}},
-        )
-        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
-            token_info = svc.validate_token("some-token")
-            assert token_info["user"]["id"] == "uid"
-            headers = mock_req.call_args.kwargs["headers"]
-            assert headers["X-Subject-Token"] == "some-token"
-
-    def test_get_token_info(self, mock_client, mock_response):
-        svc = IdentityService(mock_client)
-        resp = mock_response(
-            200,
-            json_data={"token": {"user": {"id": "uid"}, "catalog": []}},
-        )
-        with patch("conoha.base.requests.request", return_value=resp):
-            info = svc.get_token_info()
-            assert info["user"]["id"] == "uid"
-
-    def test_revoke_token(self, mock_client, mock_response):
-        svc = IdentityService(mock_client)
-        resp = mock_response(204)
-        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
-            svc.revoke_token("old-token")
-            assert mock_req.call_args[0][0] == "DELETE"
-            headers = mock_req.call_args.kwargs["headers"]
-            assert headers["X-Subject-Token"] == "old-token"
-
     # ── Sub-users ─────────────────────────────────────────────
 
     def test_list_users(self, mock_client, mock_response):

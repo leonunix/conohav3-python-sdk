@@ -3,6 +3,7 @@
 import os
 import time
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 import requests
 
@@ -220,7 +221,12 @@ class ConoHaClient:
         return self._token
 
     def _parse_catalog(self, catalog):
-        """Parse the service catalog from token response."""
+        """Parse the service catalog from token response.
+
+        Catalog URLs often include version paths (e.g. /v2.1, /v3/{tenant_id}).
+        We strip the path and keep only scheme + host, since service modules
+        construct full paths themselves.
+        """
         service_map = {
             "identity": "identity",
             "compute": "compute",
@@ -237,7 +243,9 @@ class ConoHaClient:
             if sdk_name:
                 for endpoint in entry.get("endpoints", []):
                     if endpoint.get("interface") == "public":
-                        self._catalog_endpoints[sdk_name] = endpoint["url"]
+                        parsed = urlparse(endpoint["url"])
+                        base_url = f"{parsed.scheme}://{parsed.netloc}"
+                        self._catalog_endpoints[sdk_name] = base_url
                         break
 
     # ── Service Properties ───────────────────────────────────────

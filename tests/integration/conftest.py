@@ -2,12 +2,13 @@
 
 Integration tests require real ConoHa API credentials set via
 environment variables:
-    CONOHA_USERNAME   - API username
+    CONOHA_USER_ID    - API user ID (UUID)
     CONOHA_PASSWORD   - API password
     CONOHA_TENANT_ID  - Tenant/Project ID
     CONOHA_REGION     - Region (default: c3j1)
 
 Run integration tests with:
+    source .env.test
     pytest tests/integration/ -v --run-integration
 """
 
@@ -41,19 +42,19 @@ def pytest_collection_modifyitems(config, items):
 @pytest.fixture(scope="session")
 def conoha_client():
     """Create a real ConoHa client for integration tests."""
-    username = os.environ.get("CONOHA_USERNAME")
+    user_id = os.environ.get("CONOHA_USER_ID")
     password = os.environ.get("CONOHA_PASSWORD")
     tenant_id = os.environ.get("CONOHA_TENANT_ID")
     region = os.environ.get("CONOHA_REGION", "c3j1")
 
-    if not all([username, password, tenant_id]):
+    if not all([user_id, password, tenant_id]):
         pytest.skip(
-            "Integration tests require CONOHA_USERNAME, CONOHA_PASSWORD, "
+            "Integration tests require CONOHA_USER_ID, CONOHA_PASSWORD, "
             "and CONOHA_TENANT_ID environment variables"
         )
 
     client = ConoHaClient(
-        username=username,
+        user_id=user_id,
         password=password,
         tenant_id=tenant_id,
         region=region,

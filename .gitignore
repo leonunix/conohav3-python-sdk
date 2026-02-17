@@ -10,6 +10,7 @@ build/
 .coverage
 htmlcov/
 .env
+.env.*
 .venv/
 venv/
 .claude/

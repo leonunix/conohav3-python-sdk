@@ -72,7 +72,11 @@ class BaseService:
             try:
                 body = response.json()
                 if "error" in body:
-                    message = body["error"].get("message", message)
+                    err = body["error"]
+                    if isinstance(err, dict):
+                        message = err.get("message", message)
+                    else:
+                        message = str(err)
                 elif "message" in body:
                     message = body["message"]
             except (ValueError, KeyError):

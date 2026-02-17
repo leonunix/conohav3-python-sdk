@@ -51,34 +51,6 @@ class IdentityService(BaseService):
         url = f"{self._base_url}/v3/users/{user_id}/credentials/OS-EC2/{credential_id}"
         self._delete(url)
 
-    # ── Token Management ──────────────────────────────────────
-
-    def validate_token(self, token):
-        """Validate a token and get its metadata.
-
-        GET /v3/auth/tokens
-        """
-        url = f"{self._base_url}/v3/auth/tokens"
-        resp = self._get(url, extra_headers={"X-Subject-Token": token})
-        return resp.json()["token"]
-
-    def get_token_info(self):
-        """Get info about the current token.
-
-        GET /v3/auth/tokens
-        """
-        url = f"{self._base_url}/v3/auth/tokens"
-        resp = self._get(url, extra_headers={"X-Subject-Token": self._token})
-        return resp.json()["token"]
-
-    def revoke_token(self, token):
-        """Revoke a token.
-
-        DELETE /v3/auth/tokens
-        """
-        url = f"{self._base_url}/v3/auth/tokens"
-        self._delete(url, extra_headers={"X-Subject-Token": token})
-
     # ── Sub-users ─────────────────────────────────────────────
 
     def list_users(self):

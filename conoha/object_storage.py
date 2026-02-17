@@ -234,7 +234,7 @@ class ObjectStorageService(BaseService):
         Uses X-Remove-Versions-Location to remove the versioning setting.
         """
         url = self._account_url(f"/{container}")
-        self._post(url, extra_headers={"X-Remove-Versions-Location": "x"})
+        self._post(url, extra_headers={"X-Remove-Versions-Location": ""})
 
     # ── Dynamic Large Object (DLO) ───────────────────────────
 

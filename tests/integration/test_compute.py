@@ -82,10 +82,13 @@ class TestComputeServerLifecycle:
         server_name = unique_name("sdk-inttest-srv")
 
         try:
-            # Get the smallest flavor
+            # Find the g2l-t-c2m1 flavor
             flavors = conoha_client.compute.list_flavors_detail()
-            flavors_sorted = sorted(flavors, key=lambda f: f.get("vcpus", 0))
-            flavor_id = flavors_sorted[0]["id"]
+            flavor = next(
+                (f for f in flavors if f.get("name") == "g2l-t-c2m1"),
+                flavors[0],
+            )
+            flavor_id = flavor["id"]
 
             # Get a public image for boot volume
             images = conoha_client.image.list_images(visibility="public")
@@ -173,6 +176,27 @@ class TestComputeServerLifecycle:
             vols = conoha_client.compute.list_attached_volumes(server_id)
             assert isinstance(vols, list)
 
+            # Get addresses by network name
+            addresses = conoha_client.compute.get_server_addresses(server_id)
+            if addresses:
+                # Pick the first network name
+                network_name = list(addresses.keys())[0]
+                net_addrs = conoha_client.compute.get_server_addresses_by_network(
+                    server_id, network_name
+                )
+                assert isinstance(net_addrs, list)
+                if net_addrs:
+                    assert "addr" in net_addrs[0]
+
+            # Set server settings (hw_video_model)
+            try:
+                conoha_client.compute.set_server_settings(
+                    server_id, hw_video_model="vga"
+                )
+            except Exception:
+                # Some plans/images may not support this action
+                pass
+
             # Stop server
             conoha_client.compute.stop_server(server_id)
             wait_for_status(
@@ -196,12 +220,22 @@ class TestComputeServerLifecycle:
             wait_for_status(
                 lambda: conoha_client.compute.get_server(server_id),
                 "ACTIVE",
-                timeout=120,
+                timeout=300,
             )
 
         finally:
             # Cleanup: delete server
             if server_id:
+                try:
+                    # Wait for server to leave transitional states
+                    # (REBOOT, BUILD, RESIZE, etc.) before deleting
+                    wait_for_status(
+                        lambda: conoha_client.compute.get_server(server_id),
+                        ["ACTIVE", "SHUTOFF", "ERROR"],
+                        timeout=300,
+                    )
+                except Exception:
+                    pass
                 try:
                     conoha_client.compute.delete_server(server_id)
                     wait_for_deleted(

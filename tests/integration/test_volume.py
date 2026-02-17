@@ -38,15 +38,15 @@ class TestVolumeCRUD:
         volume_id = None
 
         try:
-            # Create volume (minimum 30GB on ConoHa)
+            # Create volume (additional volumes require 200/500/1000/5000/10000)
             vol = conoha_client.volume.create_volume(
-                size=30,
+                size=200,
                 name=vol_name,
                 description="integration test volume",
             )
             volume_id = vol["id"]
             assert volume_id is not None
-            assert vol["size"] == 30
+            assert vol["size"] == 200
 
             # Wait for available
             wait_for_status(
@@ -58,7 +58,7 @@ class TestVolumeCRUD:
             # Get
             fetched = conoha_client.volume.get_volume(volume_id)
             assert fetched["id"] == volume_id
-            assert fetched["size"] == 30
+            assert fetched["size"] == 200
 
             # Update
             new_name = vol_name + "-updated"
