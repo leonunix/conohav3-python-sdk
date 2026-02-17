@@ -215,15 +215,17 @@ class ComputeService(BaseService):
         """Update server hardware settings. Server must be stopped.
 
         POST /v2.1/servers/{server_id}/action
+        Each setting is sent as a separate action request.
+        hw_video_model: "vga", "qxl", or "cirrus"
+        hw_vif_model: "virtio" or "e1000"
+        hw_disk_bus: "virtio" or "ide"
         """
-        settings = {}
         if hw_video_model is not None:
-            settings["hwVideoModel"] = hw_video_model
+            self._server_action(server_id, {"hwVideoModel": hw_video_model})
         if hw_vif_model is not None:
-            settings["hwVifModel"] = hw_vif_model
+            self._server_action(server_id, {"hwVifModel": hw_vif_model})
         if hw_disk_bus is not None:
-            settings["hwDiskBus"] = hw_disk_bus
-        self._server_action(server_id, {"setServerSettings": settings})
+            self._server_action(server_id, {"hwDiskBus": hw_disk_bus})
 
     # ── Server Security Groups ───────────────────────────────────
 

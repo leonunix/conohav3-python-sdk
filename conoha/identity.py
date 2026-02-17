@@ -84,129 +84,149 @@ class IdentityService(BaseService):
     def list_users(self):
         """List sub-users.
 
-        GET /v3/users
+        GET /v3/sub-users
         """
-        url = f"{self._base_url}/v3/users"
+        url = f"{self._base_url}/v3/sub-users"
         resp = self._get(url)
         return resp.json()["users"]
 
-    def create_user(self, name, password, email=None, description=None):
+    def create_user(self, password, roles):
         """Create a sub-user.
 
-        POST /v3/users
+        POST /v3/sub-users
+        password: 9-70 chars, must include lowercase, uppercase, and numbers/symbols.
+        roles: list of role IDs to assign. At least one required. Max 500.
+        Max 10 sub-users per account.
         """
-        body = {"user": {"name": name, "password": password}}
-        if email:
-            body["user"]["email"] = email
-        if description:
-            body["user"]["description"] = description
-        url = f"{self._base_url}/v3/users"
+        body = {"user": {"password": password, "roles": roles}}
+        url = f"{self._base_url}/v3/sub-users"
         resp = self._post(url, json=body)
         return resp.json()["user"]
 
-    def get_user(self, user_id):
+    def get_user(self, subuser_id):
         """Get sub-user details.
 
-        GET /v3/users/{user_id}
+        GET /v3/sub-users/{subuser_id}
         """
-        url = f"{self._base_url}/v3/users/{user_id}"
+        url = f"{self._base_url}/v3/sub-users/{subuser_id}"
         resp = self._get(url)
         return resp.json()["user"]
 
-    def update_user(self, user_id, name=None, password=None, email=None,
-                    description=None):
-        """Update a sub-user.
+    def update_user(self, subuser_id, password):
+        """Update a sub-user's password.
 
-        PATCH /v3/users/{user_id}
+        PUT /v3/sub-users/{subuser_id}
         """
-        body = {"user": {}}
-        if name is not None:
-            body["user"]["name"] = name
-        if password is not None:
-            body["user"]["password"] = password
-        if email is not None:
-            body["user"]["email"] = email
-        if description is not None:
-            body["user"]["description"] = description
-        url = f"{self._base_url}/v3/users/{user_id}"
-        resp = self._patch(url, json=body)
+        body = {"user": {"password": password}}
+        url = f"{self._base_url}/v3/sub-users/{subuser_id}"
+        resp = self._put(url, json=body)
         return resp.json()["user"]
 
-    def delete_user(self, user_id):
+    def delete_user(self, subuser_id):
         """Delete a sub-user.
 
-        DELETE /v3/users/{user_id}
+        DELETE /v3/sub-users/{subuser_id}
         """
-        url = f"{self._base_url}/v3/users/{user_id}"
+        url = f"{self._base_url}/v3/sub-users/{subuser_id}"
         self._delete(url)
+
+    def assign_roles(self, subuser_id, role_ids):
+        """Assign roles to a sub-user.
+
+        POST /v3/sub-users/{subuser_id}/assign
+        role_ids: list of role IDs. Max 500 assignments per sub-user.
+        """
+        url = f"{self._base_url}/v3/sub-users/{subuser_id}/assign"
+        resp = self._post(url, json={"roles": role_ids})
+        return resp.json()["user"]
+
+    def unassign_roles(self, subuser_id, role_ids):
+        """Remove roles from a sub-user.
+
+        POST /v3/sub-users/{subuser_id}/unassign
+        At least one role must remain assigned.
+        """
+        url = f"{self._base_url}/v3/sub-users/{subuser_id}/unassign"
+        resp = self._post(url, json={"roles": role_ids})
+        return resp.json()["user"]
 
     # ── Roles ─────────────────────────────────────────────────
 
     def list_roles(self):
         """List available roles.
 
-        GET /v3/roles
+        GET /v3/sub-users/roles
         """
-        url = f"{self._base_url}/v3/roles"
+        url = f"{self._base_url}/v3/sub-users/roles"
         resp = self._get(url)
         return resp.json()["roles"]
 
-    def list_user_roles(self, project_id, user_id):
-        """List roles assigned to a user on a project.
+    def create_role(self, name, permissions):
+        """Create a role.
 
-        GET /v3/projects/{project_id}/users/{user_id}/roles
+        POST /v3/sub-users/roles
+        name: 1-32 chars, alphanumeric, underscores, hyphens.
+        permissions: list of permission name strings.
         """
-        url = (f"{self._base_url}/v3/projects/{project_id}"
-               f"/users/{user_id}/roles")
+        body = {"role": {"name": name, "permissions": permissions}}
+        url = f"{self._base_url}/v3/sub-users/roles"
+        resp = self._post(url, json=body)
+        return resp.json()["role"]
+
+    def get_role(self, role_id):
+        """Get role details.
+
+        GET /v3/sub-users/roles/{role_id}
+        """
+        url = f"{self._base_url}/v3/sub-users/roles/{role_id}"
         resp = self._get(url)
-        return resp.json()["roles"]
+        return resp.json()["role"]
 
-    def assign_role(self, project_id, user_id, role_id):
-        """Assign a role to a user on a project.
+    def update_role(self, role_id, name):
+        """Update a role's name.
 
-        PUT /v3/projects/{project_id}/users/{user_id}/roles/{role_id}
+        PUT /v3/sub-users/roles/{role_id}
         """
-        url = (f"{self._base_url}/v3/projects/{project_id}"
-               f"/users/{user_id}/roles/{role_id}")
-        self._put(url)
+        body = {"role": {"name": name}}
+        url = f"{self._base_url}/v3/sub-users/roles/{role_id}"
+        resp = self._put(url, json=body)
+        return resp.json()["role"]
 
-    def unassign_role(self, project_id, user_id, role_id):
-        """Remove a role from a user on a project.
+    def delete_role(self, role_id):
+        """Delete a role. Cannot delete roles assigned to sub-users.
 
-        DELETE /v3/projects/{project_id}/users/{user_id}/roles/{role_id}
+        DELETE /v3/sub-users/roles/{role_id}
         """
-        url = (f"{self._base_url}/v3/projects/{project_id}"
-               f"/users/{user_id}/roles/{role_id}")
+        url = f"{self._base_url}/v3/sub-users/roles/{role_id}"
         self._delete(url)
-
-    def check_role(self, project_id, user_id, role_id):
-        """Check if a user has a role on a project.
-
-        HEAD /v3/projects/{project_id}/users/{user_id}/roles/{role_id}
-        Returns True if the role assignment exists.
-        """
-        url = (f"{self._base_url}/v3/projects/{project_id}"
-               f"/users/{user_id}/roles/{role_id}")
-        self._head(url)
-        return True
 
     # ── Permissions ───────────────────────────────────────────
 
-    def list_permissions(self, role_id):
-        """List permissions for a role.
+    def list_permissions(self):
+        """List all available permissions.
 
-        GET /v3/roles/{role_id}/permissions
+        GET /v3/permissions
         """
-        url = f"{self._base_url}/v3/roles/{role_id}/permissions"
+        url = f"{self._base_url}/v3/permissions"
         resp = self._get(url)
         return resp.json()["permissions"]
 
-    def update_permissions(self, role_id, permissions):
-        """Update permissions for a role.
+    def assign_permissions(self, role_id, permissions):
+        """Assign permissions to a role.
 
-        PUT /v3/roles/{role_id}/permissions
-        permissions: dict of permission settings.
+        POST /v3/sub-users/roles/{role_id}/assign
+        permissions: list of permission name strings.
         """
-        url = f"{self._base_url}/v3/roles/{role_id}/permissions"
-        resp = self._put(url, json={"permissions": permissions})
-        return resp.json()["permissions"]
+        url = f"{self._base_url}/v3/sub-users/roles/{role_id}/assign"
+        resp = self._post(url, json={"permissions": permissions})
+        return resp.json()["role"]
+
+    def unassign_permissions(self, role_id, permissions):
+        """Remove permissions from a role.
+
+        POST /v3/sub-users/roles/{role_id}/unassign
+        At least one permission must remain assigned.
+        """
+        url = f"{self._base_url}/v3/sub-users/roles/{role_id}/unassign"
+        resp = self._post(url, json={"permissions": permissions})
+        return resp.json()["role"]

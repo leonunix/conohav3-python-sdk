@@ -289,7 +289,7 @@ except NotFoundError:
 except AuthenticationError:
     print("認証情報が無効です")
 except APIError as e:
-    print(f"APIエラー {e.status_code}: {e.message}")
+    print(f"APIエラー {e.status_code}: {e}")
 ```
 
 ## 設定

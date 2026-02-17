@@ -231,9 +231,10 @@ class ObjectStorageService(BaseService):
         """Disable object versioning on a container.
 
         POST /v1/AUTH_{tenant_id}/{container}
+        Uses X-Remove-Versions-Location to remove the versioning setting.
         """
         url = self._account_url(f"/{container}")
-        self._post(url, extra_headers={"X-Versions-Location": ""})
+        self._post(url, extra_headers={"X-Remove-Versions-Location": "x"})
 
     # ── Dynamic Large Object (DLO) ───────────────────────────
 

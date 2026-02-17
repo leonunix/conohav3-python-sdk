@@ -148,7 +148,7 @@ class TestObjectStorageService:
         with patch("conoha.base.requests.request", return_value=resp) as mock_req:
             svc.disable_versioning("mycontainer")
             headers = mock_req.call_args.kwargs["headers"]
-            assert headers["X-Versions-Location"] == ""
+            assert "X-Remove-Versions-Location" in headers
 
     # ── Large Objects ─────────────────────────────────────────
 

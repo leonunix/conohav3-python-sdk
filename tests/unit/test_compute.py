@@ -242,7 +242,9 @@ class TestComputeService:
         with patch("conoha.base.requests.request", return_value=resp) as mock_req:
             svc.set_server_settings("s1", hw_video_model="qxl",
                                     hw_vif_model="virtio")
-            body = mock_req.call_args.kwargs["json"]
-            assert body["setServerSettings"]["hwVideoModel"] == "qxl"
-            assert body["setServerSettings"]["hwVifModel"] == "virtio"
-            assert "hwDiskBus" not in body["setServerSettings"]
+            # Each setting is a separate action call
+            assert mock_req.call_count == 2
+            first_body = mock_req.call_args_list[0].kwargs["json"]
+            assert first_body == {"hwVideoModel": "qxl"}
+            second_body = mock_req.call_args_list[1].kwargs["json"]
+            assert second_body == {"hwVifModel": "virtio"}

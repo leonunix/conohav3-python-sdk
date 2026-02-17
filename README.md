@@ -290,7 +290,7 @@ except NotFoundError:
 except AuthenticationError:
     print("Invalid credentials")
 except APIError as e:
-    print(f"API error {e.status_code}: {e.message}")
+    print(f"API error {e.status_code}: {e}")
 ```
 
 ## Configuration
