@@ -79,6 +79,7 @@ class TestComputeServerLifecycle:
         """Create server, perform operations, then delete."""
         server_id = None
         volume_id = None
+        extra_volume_id = None
         server_name = unique_name("sdk-inttest-srv")
 
         try:
@@ -145,6 +146,14 @@ class TestComputeServerLifecycle:
             servers = conoha_client.compute.list_servers()
             assert any(s["id"] == server_id for s in servers)
 
+            # List servers detail
+            servers_detail = conoha_client.compute.list_servers_detail()
+            srv_detail = next(
+                (s for s in servers_detail if s["id"] == server_id), None
+            )
+            assert srv_detail is not None
+            assert "status" in srv_detail
+
             # Get addresses
             addresses = conoha_client.compute.get_server_addresses(server_id)
             assert isinstance(addresses, dict)
@@ -176,6 +185,14 @@ class TestComputeServerLifecycle:
             vols = conoha_client.compute.list_attached_volumes(server_id)
             assert isinstance(vols, list)
 
+            # Get attached volume detail (boot volume)
+            if vols:
+                att_vol_id = vols[0].get("volumeId", vols[0].get("id"))
+                vol_attachment = conoha_client.compute.get_attached_volume(
+                    server_id, att_vol_id
+                )
+                assert isinstance(vol_attachment, dict)
+
             # Get addresses by network name
             addresses = conoha_client.compute.get_server_addresses(server_id)
             if addresses:
@@ -196,6 +213,19 @@ class TestComputeServerLifecycle:
             except Exception:
                 # Some plans/images may not support this action
                 pass
+
+            # --- Monitoring graphs ---
+            cpu_data = conoha_client.compute.get_cpu_graph(server_id)
+            assert cpu_data is not None
+
+            disk_data = conoha_client.compute.get_disk_io_graph(server_id)
+            assert disk_data is not None
+
+            if ports:
+                traffic_data = conoha_client.compute.get_traffic_graph(
+                    server_id, ports[0]["port_id"]
+                )
+                assert traffic_data is not None
 
             # Stop server
             conoha_client.compute.stop_server(server_id)
@@ -232,13 +262,50 @@ class TestComputeServerLifecycle:
             assert target_flavor is not None, "g2l-t-c3m2 flavor not found"
             target_flavor_id = target_flavor["id"]
 
-            # Stop server before resize
-            conoha_client.compute.stop_server(server_id)
+            # Force stop server before resize
+            conoha_client.compute.force_stop_server(server_id)
             wait_for_status(
                 lambda: conoha_client.compute.get_server(server_id),
                 "SHUTOFF",
                 timeout=120,
             )
+
+            # --- Attach / get / detach extra volume (server is stopped) ---
+            extra_vol = conoha_client.volume.create_volume(
+                size=30,
+                name=unique_name("sdk-inttest-xvol"),
+            )
+            extra_volume_id = extra_vol["id"]
+            wait_for_status(
+                lambda: conoha_client.volume.get_volume(extra_volume_id),
+                "available",
+                timeout=120,
+            )
+
+            # Attach
+            attachment = conoha_client.compute.attach_volume(
+                server_id, extra_volume_id
+            )
+            assert attachment["volumeId"] == extra_volume_id
+            time.sleep(5)
+
+            # Get attached volume detail
+            att_detail = conoha_client.compute.get_attached_volume(
+                server_id, extra_volume_id
+            )
+            assert att_detail["volumeId"] == extra_volume_id
+
+            # Detach
+            conoha_client.compute.detach_volume(server_id, extra_volume_id)
+            wait_for_status(
+                lambda: conoha_client.volume.get_volume(extra_volume_id),
+                "available",
+                timeout=120,
+            )
+
+            # Clean up extra volume
+            conoha_client.volume.delete_volume(extra_volume_id)
+            extra_volume_id = None
 
             # Resize server
             conoha_client.compute.resize_server(server_id, target_flavor_id)
@@ -257,6 +324,36 @@ class TestComputeServerLifecycle:
             )
 
             # Verify flavor changed
+            srv = conoha_client.compute.get_server(server_id)
+            assert srv["flavor"]["id"] == target_flavor_id
+
+            # --- Revert resize: resize to c2m1, then revert back to c3m2 ---
+            # Ensure server is stopped
+            if srv["status"] != "SHUTOFF":
+                conoha_client.compute.stop_server(server_id)
+                wait_for_status(
+                    lambda: conoha_client.compute.get_server(server_id),
+                    "SHUTOFF",
+                    timeout=120,
+                )
+
+            # Resize to original c2m1
+            conoha_client.compute.resize_server(server_id, flavor_id)
+            wait_for_status(
+                lambda: conoha_client.compute.get_server(server_id),
+                "VERIFY_RESIZE",
+                timeout=300,
+            )
+
+            # Revert (should go back to c3m2)
+            conoha_client.compute.revert_resize(server_id)
+            wait_for_status(
+                lambda: conoha_client.compute.get_server(server_id),
+                ["ACTIVE", "SHUTOFF"],
+                timeout=300,
+            )
+
+            # Verify flavor reverted to c3m2
             srv = conoha_client.compute.get_server(server_id)
             assert srv["flavor"]["id"] == target_flavor_id
 
@@ -279,6 +376,18 @@ class TestComputeServerLifecycle:
                         lambda: conoha_client.compute.get_server(server_id),
                         timeout=120,
                     )
+                except Exception:
+                    pass
+
+            # Cleanup: delete extra volume
+            if extra_volume_id:
+                try:
+                    wait_for_status(
+                        lambda: conoha_client.volume.get_volume(extra_volume_id),
+                        ["available", "error"],
+                        timeout=120,
+                    )
+                    conoha_client.volume.delete_volume(extra_volume_id)
                 except Exception:
                     pass
 
