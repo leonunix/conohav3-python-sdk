@@ -80,6 +80,9 @@ class TestComputeServerLifecycle:
         server_id = None
         volume_id = None
         extra_volume_id = None
+        local_net_id = None
+        local_subnet_id = None
+        local_port_id = None
         server_name = unique_name("sdk-inttest-srv")
 
         try:
@@ -272,7 +275,7 @@ class TestComputeServerLifecycle:
 
             # --- Attach / get / detach extra volume (server is stopped) ---
             extra_vol = conoha_client.volume.create_volume(
-                size=30,
+                size=200,
                 name=unique_name("sdk-inttest-xvol"),
             )
             extra_volume_id = extra_vol["id"]
@@ -306,6 +309,49 @@ class TestComputeServerLifecycle:
             # Clean up extra volume
             conoha_client.volume.delete_volume(extra_volume_id)
             extra_volume_id = None
+
+            # --- Attach / get / detach port via local network ---
+            local_net = conoha_client.network.create_network(
+                name=unique_name("sdk-inttest-net"),
+            )
+            local_net_id = local_net["id"]
+
+            local_subnet = conoha_client.network.create_subnet(
+                network_id=local_net_id,
+                cidr="192.168.200.0/24",
+                ip_version=4,
+            )
+            local_subnet_id = local_subnet["id"]
+
+            local_port = conoha_client.network.create_port(
+                network_id=local_net_id,
+            )
+            local_port_id = local_port["id"]
+
+            # Attach port
+            att_port = conoha_client.compute.attach_port(
+                server_id, local_port_id
+            )
+            assert att_port["port_id"] == local_port_id
+            time.sleep(5)
+
+            # Get attached port detail
+            port_detail = conoha_client.compute.get_attached_port(
+                server_id, local_port_id
+            )
+            assert port_detail["port_id"] == local_port_id
+
+            # Detach port
+            conoha_client.compute.detach_port(server_id, local_port_id)
+            time.sleep(5)
+
+            # Clean up local network resources
+            conoha_client.network.delete_port(local_port_id)
+            local_port_id = None
+            conoha_client.network.delete_subnet(local_subnet_id)
+            local_subnet_id = None
+            conoha_client.network.delete_network(local_net_id)
+            local_net_id = None
 
             # Resize server
             conoha_client.compute.resize_server(server_id, target_flavor_id)
@@ -376,6 +422,27 @@ class TestComputeServerLifecycle:
                         lambda: conoha_client.compute.get_server(server_id),
                         timeout=120,
                     )
+                except Exception:
+                    pass
+
+            # Cleanup: delete local network resources (port → subnet → network)
+            if local_port_id:
+                try:
+                    conoha_client.compute.detach_port(server_id, local_port_id)
+                except Exception:
+                    pass
+                try:
+                    conoha_client.network.delete_port(local_port_id)
+                except Exception:
+                    pass
+            if local_subnet_id:
+                try:
+                    conoha_client.network.delete_subnet(local_subnet_id)
+                except Exception:
+                    pass
+            if local_net_id:
+                try:
+                    conoha_client.network.delete_network(local_net_id)
                 except Exception:
                     pass
 
