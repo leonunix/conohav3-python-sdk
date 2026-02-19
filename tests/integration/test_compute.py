@@ -223,6 +223,43 @@ class TestComputeServerLifecycle:
                 timeout=300,
             )
 
+            # --- Plan change (resize) from c2m1 → c3m2 ---
+            # Find the c3m2 flavor
+            target_flavor = next(
+                (f for f in flavors if f.get("name") == "g2l-t-c3m2"),
+                None,
+            )
+            assert target_flavor is not None, "g2l-t-c3m2 flavor not found"
+            target_flavor_id = target_flavor["id"]
+
+            # Stop server before resize
+            conoha_client.compute.stop_server(server_id)
+            wait_for_status(
+                lambda: conoha_client.compute.get_server(server_id),
+                "SHUTOFF",
+                timeout=120,
+            )
+
+            # Resize server
+            conoha_client.compute.resize_server(server_id, target_flavor_id)
+            wait_for_status(
+                lambda: conoha_client.compute.get_server(server_id),
+                "VERIFY_RESIZE",
+                timeout=300,
+            )
+
+            # Confirm resize
+            conoha_client.compute.confirm_resize(server_id)
+            wait_for_status(
+                lambda: conoha_client.compute.get_server(server_id),
+                ["ACTIVE", "SHUTOFF"],
+                timeout=300,
+            )
+
+            # Verify flavor changed
+            srv = conoha_client.compute.get_server(server_id)
+            assert srv["flavor"]["id"] == target_flavor_id
+
         finally:
             # Cleanup: delete server
             if server_id:
@@ -231,7 +268,7 @@ class TestComputeServerLifecycle:
                     # (REBOOT, BUILD, RESIZE, etc.) before deleting
                     wait_for_status(
                         lambda: conoha_client.compute.get_server(server_id),
-                        ["ACTIVE", "SHUTOFF", "ERROR"],
+                        ["ACTIVE", "SHUTOFF", "VERIFY_RESIZE", "ERROR"],
                         timeout=300,
                     )
                 except Exception:
