@@ -132,7 +132,18 @@ client.volume.save_volume_as_image("volume-id", "my-image-name")
 
 # Backups
 backups = client.volume.list_backups_detail()
+
+# Enable weekly backup (default)
 client.volume.enable_auto_backup("server-id")
+
+# Enable daily backup with 14-day retention
+client.volume.enable_auto_backup("server-id", schedule="daily", retention=14)
+
+# Update daily backup retention to 30 days
+client.volume.update_backup_retention("server-id", retention=30)
+
+# Disable auto-backup (cancels both weekly and daily)
+client.volume.disable_auto_backup("server-id")
 ```
 
 ### Image

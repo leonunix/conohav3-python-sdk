@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from conoha.exceptions import NotFoundError
 from conoha.volume import VolumeService
 
 
@@ -108,6 +109,81 @@ class TestVolumeService:
             assert result["instance_uuid"] == "s1"
             body = mock_req.call_args.kwargs["json"]
             assert body["backup"]["instance_uuid"] == "s1"
+
+    def test_enable_auto_backup_daily(self, mock_client, mock_response):
+        """Enable daily backup with retention."""
+        svc = VolumeService(mock_client)
+        resp = mock_response(
+            201,
+            json_data={
+                "backup": {"instance_uuid": "s1", "id": "backup-1"}
+            },
+        )
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            result = svc.enable_auto_backup("s1", schedule="daily", retention=30)
+            assert result["instance_uuid"] == "s1"
+            body = mock_req.call_args.kwargs["json"]
+            assert body["backup"]["instance_uuid"] == "s1"
+            assert body["backup"]["schedule"] == "daily"
+            assert body["backup"]["retention"] == 30
+
+    def test_enable_auto_backup_default_no_extra_params(self, mock_client, mock_response):
+        """Enable auto-backup without schedule/retention sends minimal body."""
+        svc = VolumeService(mock_client)
+        resp = mock_response(
+            201,
+            json_data={
+                "backup": {"instance_uuid": "s1", "id": "backup-1"}
+            },
+        )
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.enable_auto_backup("s1")
+            body = mock_req.call_args.kwargs["json"]
+            assert body == {"backup": {"instance_uuid": "s1"}}
+            assert "schedule" not in body["backup"]
+            assert "retention" not in body["backup"]
+
+    def test_enable_auto_backup_schedule_only(self, mock_client, mock_response):
+        """Enable daily backup without explicit retention."""
+        svc = VolumeService(mock_client)
+        resp = mock_response(
+            201,
+            json_data={
+                "backup": {"instance_uuid": "s1", "id": "backup-1"}
+            },
+        )
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            svc.enable_auto_backup("s1", schedule="daily")
+            body = mock_req.call_args.kwargs["json"]
+            assert body["backup"]["schedule"] == "daily"
+            assert "retention" not in body["backup"]
+
+    def test_update_backup_retention(self, mock_client, mock_response):
+        """Update retention period for daily backup."""
+        svc = VolumeService(mock_client)
+        resp = mock_response(
+            200,
+            json_data={"backup": {"retention": 30}},
+        )
+        with patch("conoha.base.requests.request", return_value=resp) as mock_req:
+            result = svc.update_backup_retention("s1", 30)
+            assert result["retention"] == 30
+            assert mock_req.call_args[0][0] == "PUT"
+            url = mock_req.call_args[0][1]
+            assert "/v3/tenant-id-12345/backups/s1" in url
+            body = mock_req.call_args.kwargs["json"]
+            assert body == {"backup": {"retention": 30}}
+
+    def test_update_backup_retention_not_found(self, mock_client, mock_response):
+        """Update retention raises NotFoundError when daily backup not subscribed."""
+        svc = VolumeService(mock_client)
+        resp = mock_response(
+            404,
+            json_data={"error": {"message": "Daily backup not found"}},
+        )
+        with patch("conoha.base.requests.request", return_value=resp):
+            with pytest.raises(NotFoundError):
+                svc.update_backup_retention("s1", 14)
 
     def test_restore_backup(self, mock_client, mock_response):
         svc = VolumeService(mock_client)

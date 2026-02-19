@@ -161,17 +161,46 @@ class VolumeService(BaseService):
         resp = self._get(self._project_url(f"/backups/{backup_id}"))
         return resp.json()["backup"]
 
-    def enable_auto_backup(self, server_id):
+    def enable_auto_backup(self, server_id, schedule=None, retention=None):
         """Enable auto-backup for a server's volumes.
 
         POST /v3/{project_id}/backups
+
+        Args:
+            server_id: The server (instance) UUID.
+            schedule: Backup frequency - "daily" or "weekly" (default: "weekly").
+            retention: Retention period in days (14-30).
+                Only effective for daily backups.
         """
         body = {"backup": {"instance_uuid": server_id}}
+        if schedule is not None:
+            body["backup"]["schedule"] = schedule
+        if retention is not None:
+            body["backup"]["retention"] = retention
         resp = self._post(self._project_url("/backups"), json=body)
+        return resp.json()["backup"]
+
+    def update_backup_retention(self, server_id, retention):
+        """Update retention period for daily backup.
+
+        PUT /v3/{project_id}/backups/{server_id}
+
+        Requires an active daily backup subscription.
+
+        Args:
+            server_id: The server (instance) UUID.
+            retention: New retention period in days (14-30).
+        """
+        body = {"backup": {"retention": retention}}
+        resp = self._put(
+            self._project_url(f"/backups/{server_id}"), json=body
+        )
         return resp.json()["backup"]
 
     def disable_auto_backup(self, server_id):
         """Disable auto-backup for a server.
+
+        Cancels both weekly and daily backup subscriptions if both are active.
 
         DELETE /v3/{project_id}/backups/{server_id}
         """
