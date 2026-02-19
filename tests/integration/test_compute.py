@@ -1,8 +1,10 @@
 """Integration tests for Compute API."""
 
+import io
 import time
 
 import pytest
+import requests as http_requests
 
 from conoha.exceptions import NotFoundError
 from tests.integration.conftest import (
@@ -10,6 +12,9 @@ from tests.integration.conftest import (
     wait_for_status,
     wait_for_deleted,
 )
+
+# Small ISO for mount/unmount testing (~7MB)
+TINY_ISO_URL = "https://dl-cdn.alpinelinux.org/alpine/v3.21/releases/x86_64/alpine-netboot-3.21.3-x86_64.iso"
 
 
 class TestComputeFlavors:
@@ -83,6 +88,7 @@ class TestComputeServerLifecycle:
         local_net_id = None
         local_subnet_id = None
         local_port_id = None
+        iso_image_id = None
         server_name = unique_name("sdk-inttest-srv")
 
         try:
@@ -237,6 +243,40 @@ class TestComputeServerLifecycle:
                 "SHUTOFF",
                 timeout=120,
             )
+
+            # --- ISO mount / unmount (server is stopped) ---
+            # Download a tiny ISO
+            iso_resp = http_requests.get(TINY_ISO_URL, timeout=120)
+            iso_resp.raise_for_status()
+            iso_data = iso_resp.content
+
+            # Create ISO image entry
+            iso_img = conoha_client.image.create_iso_image(
+                name=unique_name("sdk-inttest-iso"),
+            )
+            iso_image_id = iso_img["id"]
+
+            # Upload ISO data
+            conoha_client.image.upload_iso_image(iso_image_id, iso_data)
+
+            # Wait for image to become active
+            wait_for_status(
+                lambda: conoha_client.image.get_image(iso_image_id),
+                "active",
+                timeout=120,
+            )
+
+            # Mount ISO
+            conoha_client.compute.mount_iso(server_id, iso_image_id)
+            time.sleep(5)
+
+            # Unmount ISO
+            conoha_client.compute.unmount_iso(server_id, iso_image_id)
+            time.sleep(5)
+
+            # Clean up ISO image
+            conoha_client.image.delete_image(iso_image_id)
+            iso_image_id = None
 
             # Start server
             conoha_client.compute.start_server(server_id)
@@ -422,6 +462,13 @@ class TestComputeServerLifecycle:
                         lambda: conoha_client.compute.get_server(server_id),
                         timeout=120,
                     )
+                except Exception:
+                    pass
+
+            # Cleanup: delete ISO image
+            if iso_image_id:
+                try:
+                    conoha_client.image.delete_image(iso_image_id)
                 except Exception:
                     pass
 

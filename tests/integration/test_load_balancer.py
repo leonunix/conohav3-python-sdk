@@ -73,6 +73,13 @@ class TestLoadBalancerCRUD:
             fetched_lis = conoha_client.load_balancer.get_listener(listener_id)
             assert fetched_lis["id"] == listener_id
 
+            # Update listener
+            updated_lis = conoha_client.load_balancer.update_listener(
+                listener_id, name=unique_name("sdk-inttest-lis"),
+            )
+            assert updated_lis["id"] == listener_id
+            wait_for_lb_status(conoha_client, lb_id, "ACTIVE")
+
             # List listeners
             listeners = conoha_client.load_balancer.list_listeners()
             assert any(l["id"] == listener_id for l in listeners)
@@ -91,6 +98,13 @@ class TestLoadBalancerCRUD:
             # Get pool
             fetched_pool = conoha_client.load_balancer.get_pool(pool_id)
             assert fetched_pool["id"] == pool_id
+
+            # Update pool
+            updated_pool = conoha_client.load_balancer.update_pool(
+                pool_id, name=unique_name("sdk-inttest-pool"),
+            )
+            assert updated_pool["id"] == pool_id
+            wait_for_lb_status(conoha_client, lb_id, "ACTIVE")
 
             # List pools
             pools = conoha_client.load_balancer.list_pools()
@@ -112,6 +126,13 @@ class TestLoadBalancerCRUD:
             # Get health monitor
             fetched_hm = conoha_client.load_balancer.get_health_monitor(hm_id)
             assert fetched_hm["id"] == hm_id
+
+            # Update health monitor
+            updated_hm = conoha_client.load_balancer.update_health_monitor(
+                hm_id, name=unique_name("sdk-inttest-hm"),
+            )
+            assert updated_hm["id"] == hm_id
+            wait_for_lb_status(conoha_client, lb_id, "ACTIVE")
 
             # List health monitors
             hms = conoha_client.load_balancer.list_health_monitors()

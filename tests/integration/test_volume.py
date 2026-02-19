@@ -28,6 +28,11 @@ class TestVolumeBackups:
         backups = conoha_client.volume.list_backups()
         assert isinstance(backups, list)
 
+    def test_list_backups_detail(self, conoha_client):
+        """List backups with full details."""
+        backups = conoha_client.volume.list_backups_detail()
+        assert isinstance(backups, list)
+
 
 class TestVolumeCRUD:
     def test_volume_lifecycle(self, conoha_client):
