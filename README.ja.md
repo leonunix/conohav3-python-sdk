@@ -131,7 +131,18 @@ client.volume.save_volume_as_image("volume-id", "my-image-name")
 
 # バックアップ
 backups = client.volume.list_backups_detail()
+
+# 週次バックアップを有効化（デフォルト）
 client.volume.enable_auto_backup("server-id")
+
+# 日次バックアップを有効化（14日間保持）
+client.volume.enable_auto_backup("server-id", schedule="daily", retention=14)
+
+# 日次バックアップの保持期間を30日に変更
+client.volume.update_backup_retention("server-id", retention=30)
+
+# 自動バックアップを無効化（週次・日次の両方をキャンセル）
+client.volume.disable_auto_backup("server-id")
 ```
 
 ### Image（イメージ管理）
