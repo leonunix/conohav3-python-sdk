@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "conoha-python-sdk"
-version = "0.1.0"
+version = "1.0.0"
 description = "Python SDK for ConoHa VPS v3 API"
 readme = "README.md"
 license = {text = "MIT"}
